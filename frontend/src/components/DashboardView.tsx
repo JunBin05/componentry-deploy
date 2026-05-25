@@ -120,17 +120,17 @@ export default function DashboardView({ quotes, onNewQuoteClick, onViewQuote, on
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px] text-[#585956]">receipt_long</span>
               <h3 className="font-display font-bold text-sm text-[#141514]">
-                Recent Configurations & Quotes
+                Recent Quotes
               </h3>
             </div>
-            <p className="text-xs font-mono text-[#878884]">DB_STATUS: SYNCHRONIZED</p>
+            <p className="text-xs font-semibold text-[#878884]">Saved</p>
           </div>
           <div className="flex-1 overflow-y-auto">
             {quotes.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center">
                 <span className="material-symbols-outlined text-3xl text-[#dadad7] mb-2">folder_open</span>
-                <p className="text-sm font-semibold text-[#585956]">No proposals constructed yet.</p>
-                <p className="text-xs text-[#878884] mt-0.5">Use the "New Quote" engine to generate specs.</p>
+                <p className="text-sm font-semibold text-[#585956]">No quotes yet.</p>
+                <p className="text-xs text-[#878884] mt-0.5">Click "New Quote" to start.</p>
               </div>
             ) : (
               <table className="w-full text-left border-collapse">
@@ -186,7 +186,7 @@ export default function DashboardView({ quotes, onNewQuoteClick, onViewQuote, on
             {lowStockItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <span className="material-symbols-outlined text-3xl text-[#34a853] mb-2">check_circle</span>
-                <p className="text-sm font-semibold text-[#137333]">All stock levels optimal</p>
+                <p className="text-sm font-semibold text-[#137333]">Stock looks good</p>
               </div>
             ) : (
               lowStockItems.map((alert) => (

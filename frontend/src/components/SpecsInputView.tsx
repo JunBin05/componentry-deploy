@@ -6,37 +6,37 @@ interface SpecsInputViewProps {
 
 export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
   const [prompt, setPrompt] = useState("");
-  const [budget, setBudget] = useState<number>(15000);
+  const [budget, setBudget] = useState<number | "">("");
 
   const promptExamples = [
     {
       title: "Gaming Build",
       icon: "sports_esports",
-      text: "I need a high-performance gaming rig for 4K ray-traced gaming in Cyberpunk 2077. Focus on a quiet build with an RM 12,000 budget.",
+      text: "Customer needs a gaming PC for 4K games, with quiet fans and an RM 12,000 budget.",
       budget: 12000
     },
     {
       title: "Video Editing",
       icon: "movie_filter",
-      text: "Looking for a workstation optimized for Adobe Premiere Pro and DaVinci Resolve, handling 8K RED RAW footage seamlessly in multi-cam pipelines. Target budget is RM 20,000.",
+      text: "Customer edits 8K video in Adobe Premiere Pro and DaVinci Resolve. Budget is RM 20,000.",
       budget: 20000
     },
     {
       title: "3D Rendering",
       icon: "view_in_ar",
-      text: "They need a high-performance workstation primarily for 3D rendering in Blender and Maya, heavy CPU/GPU parallel data processing, and they value quiet operation. Target budget of RM 35,000.",
+      text: "Customer needs a workstation for Blender and Maya rendering. They want strong CPU and GPU performance, quiet fans, and an RM 35,000 budget.",
       budget: 35000
     },
     {
       title: "Office Productivity",
       icon: "work",
-      text: "Standard office machine for heavy Excel financial modeling, hundreds of browser tabs, and constant Zoom calls. Value reliability and small form factor. RM 2,500 target.",
+      text: "Customer needs an office PC for large Excel files, many browser tabs, and Zoom calls. Budget is RM 2,500.",
       budget: 2500
     },
     {
-      title: "Data Science & AI",
+      title: "Data Science",
       icon: "science",
-      text: "Machine learning rig capable of training and running local LLMs. Needs high GPU VRAM, fast DDR5 ECC support, and massive cooling under sustained workload. Budget is RM 45,000.",
+      text: "Customer needs a machine learning PC with a strong GPU, plenty of memory, good cooling, and an RM 45,000 budget.",
       budget: 45000
     }
   ];
@@ -51,7 +51,7 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
   };
 
   const handleStartGeneration = () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || budget === "") return;
     onGenerate(prompt, budget);
   };
 
@@ -60,10 +60,10 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
       {/* Title block */}
       <div>
         <h2 className="font-display font-bold text-2xl text-[#141514] tracking-tight">
-          Generate Specifications
+          Create New Quote
         </h2>
         <p className="text-sm text-[#585956] leading-relaxed mt-1">
-          Use plain, natural language to describe what your customer is trying to achieve. Our engine will match these needs to highly optimized component packages.
+          Describe what your customer needs. We will match it with suitable parts from your catalog.
         </p>
       </div>
 
@@ -73,18 +73,18 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
           <div className="flex items-center gap-2 pb-3 border-b border-[#dadad7]">
             <span className="material-symbols-outlined text-[20px] text-[#0d6e00]">chat_bubble_outline</span>
             <h3 className="font-display font-semibold text-sm text-[#141514]">
-              Customer Intent Profile
+              Customer Needs
             </h3>
           </div>
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-[#585956] uppercase tracking-wider">
-              Natural Language Request Inputs
+              Customer Request
             </label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the customer's needs... e.g., 'They need a high-performance workstation primarily for 3D rendering in Blender...'"
+              placeholder="Describe the customer's needs, for example: 'They need a workstation for 3D rendering in Blender.'"
               className="w-full h-52 p-4 rounded-lg border border-[#dadad7] focus:border-[#0d6e00] focus:ring-1 focus:ring-[#0d6e00]/20 bg-[#faf9f6] text-sm leading-relaxed text-[#141514] placeholder-[#878884] resize-none outline-none transition-all"
             />
             <div className="flex justify-between items-center text-[11px] text-[#878884]">
@@ -96,8 +96,8 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
           {/* Prompt Trigger Button */}
           <button
             onClick={handleStartGeneration}
-            disabled={!prompt.trim()}
-            className="w-full py-3.5 px-4 rounded-lg bg-[#0d6e00] hover:bg-[#0b5c00] text-white font-sans font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 cursor-pointer hover:shadow"
+            disabled={!prompt.trim() || budget === ""}
+            className="w-full py-3.5 px-4 rounded-lg bg-[#0d6e00] hover:bg-[#0b5c00] text-white font-sans font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:shadow"
           >
             <span>Generate Quote</span>
           </button>
@@ -110,7 +110,7 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
             <div className="flex items-center gap-2 pb-2 border-b border-[#dadad7]">
               <span className="material-symbols-outlined text-[18px] text-[#585956]">payments</span>
               <h3 className="font-display font-semibold text-sm text-[#141514]">
-                Target Pricing Bracket
+                Budget
               </h3>
             </div>
             <div className="space-y-1.5">
@@ -124,7 +124,7 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
                 <input
                   type="number"
                   value={budget}
-                  onChange={(e) => setBudget(Math.max(0, parseInt(e.target.value) || 0))}
+                  onChange={(e) => setBudget(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0))}
                   placeholder="e.g. 15000"
                   className="w-full py-2.5 pl-11 pr-4 bg-[#faf9f6] rounded-lg border border-[#dadad7] focus:border-[#0d6e00] text-sm font-semibold text-[#141514] outline-none transition-all"
                 />
@@ -137,7 +137,7 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
             <div className="flex items-center gap-2 pb-2.5 border-b border-[#dadad7]">
               <span className="material-symbols-outlined text-[18px] text-[#585956]">lightbulb</span>
               <h3 className="font-display font-semibold text-xs text-[#585956] uppercase tracking-wider">
-                Quick-Add Prompts
+                Examples
               </h3>
             </div>
 
@@ -168,7 +168,7 @@ export default function SpecsInputView({ onGenerate }: SpecsInputViewProps) {
 
             <div className="flex items-center gap-2 text-[10px] font-semibold text-[#878884] bg-white border border-[#dadad7] px-3 py-2 rounded-md">
               <span className="material-symbols-outlined text-xs text-[#0d6e00]">info</span>
-              <span>Click any quick-add prompt to append requirements automatically.</span>
+              <span>Click an example to add it to the request.</span>
             </div>
           </div>
         </div>

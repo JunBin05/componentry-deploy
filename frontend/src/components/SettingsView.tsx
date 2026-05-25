@@ -38,10 +38,10 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
       {/* Title */}
       <div className="text-center md:text-left">
         <h2 className="font-display font-bold text-xl text-[#141514] tracking-tight">
-          Workspace Settings
+          Settings
         </h2>
         <p className="text-xs text-[#585956]">
-          Manage registered enterprise details and default parameters for document serialization.
+          Set the business details shown on your quotes.
         </p>
       </div>
 
@@ -51,14 +51,14 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
           <div className="flex items-center gap-2 pb-3 border-b border-[#dadad7]">
             <span className="material-symbols-outlined text-[20px] text-[#0d6e00]">business_center</span>
             <h3 className="font-display font-semibold text-sm text-[#141514]">
-              Business Profile Configuration
+              Business Profile
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs font-semibold text-[#585956]">
             {/* Legal Name */}
             <div className="space-y-1">
-              <label className="uppercase tracking-wider">Company Registered Name</label>
+              <label className="uppercase tracking-wider">Company Name</label>
               <input
                 type="text"
                 required
@@ -71,7 +71,7 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
 
             {/* Quote Prefix */}
             <div className="space-y-1">
-              <label className="uppercase tracking-wider">Document Serial Prefix</label>
+              <label className="uppercase tracking-wider">Quote Prefix</label>
               <input
                 type="text"
                 required
@@ -85,7 +85,7 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
 
             {/* Email Address */}
             <div className="space-y-1">
-              <label className="uppercase tracking-wider">Support Contact Email</label>
+              <label className="uppercase tracking-wider">Email</label>
               <input
                 type="email"
                 required
@@ -98,7 +98,7 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
 
             {/* Phone number */}
             <div className="space-y-1">
-              <label className="uppercase tracking-wider">Support Contact Hotline</label>
+              <label className="uppercase tracking-wider">Phone Number</label>
               <input
                 type="text"
                 required
@@ -112,7 +112,7 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
 
           {/* Physical Address */}
           <div className="space-y-1 text-xs font-semibold text-[#585956]">
-            <label className="uppercase tracking-wider">Corporate Business Address</label>
+            <label className="uppercase tracking-wider">Business Address</label>
             <textarea
               required
               rows={3}
@@ -129,7 +129,7 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
               {savedSuccess && (
                 <span className="text-xs font-semibold text-[#137333] flex items-center gap-1">
                   <span className="material-symbols-outlined text-sm leading-none font-bold">check_circle</span>
-                  <span>Settings Persisted!</span>
+                  <span>Settings saved</span>
                 </span>
               )}
               <button
@@ -145,7 +145,7 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-sm font-bold">save</span>
-                    <span>Save Workspace Settings</span>
+                    <span>Save Settings</span>
                   </>
                 )}
               </button>

@@ -17,7 +17,7 @@ export default function AuthView({ onAuthenticate }: AuthViewProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company.trim() || !email.trim() || !password) {
-      setErrorMsg("All authentication credential parameters are required.");
+      setErrorMsg("Please fill in company name, email, and password.");
       return;
     }
 
@@ -76,9 +76,9 @@ export default function AuthView({ onAuthenticate }: AuthViewProps) {
             <span className="material-symbols-outlined text-2xl font-bold">shield_person</span>
           </div>
           <div className="space-y-0.5">
-            <h3 className="font-bold text-[#141514] tracking-tight text-lg">Secure Supplier Gateway</h3>
+            <h3 className="font-bold text-[#141514] tracking-tight text-lg">Sign in to Componentry</h3>
             <p className="text-[11px] text-[#585956] px-4 leading-relaxed">
-              Authenticate your identity to access catalog registries and CPQ proposal outputs.
+              Manage your parts catalog and create customer quotes.
             </p>
           </div>
         </div>
@@ -98,19 +98,19 @@ export default function AuthView({ onAuthenticate }: AuthViewProps) {
 
           <div className="space-y-3.5 text-xs font-semibold text-[#585956]">
             <div className="space-y-1">
-              <label className="uppercase tracking-wider">Company Node Identifier</label>
+              <label className="uppercase tracking-wider">Company Name</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-[#878884] text-base leading-none">corporate_fare</span>
                 </div>
                 <input type="text" required value={company} onChange={(e) => setCompany(e.target.value)}
-                  placeholder="e.g. Intel Corp Node 4"
+                  placeholder="e.g. Intel Corp"
                   className="w-full pl-9 pr-3 py-2.5 bg-[#faf9f6] border border-[#dadad7] focus:border-[#0d6e00] rounded-lg outline-none text-xs font-semibold text-[#141514] transition-all" />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="uppercase tracking-wider">L1 Administrator Email</label>
+              <label className="uppercase tracking-wider">Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-[#878884] text-base leading-none">mail</span>
@@ -122,13 +122,13 @@ export default function AuthView({ onAuthenticate }: AuthViewProps) {
             </div>
 
             <div className="space-y-1">
-              <label className="uppercase tracking-wider">Secure Access Key Code</label>
+              <label className="uppercase tracking-wider">Password</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-[#878884] text-base leading-none">lock</span>
                 </div>
                 <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••••"
+                  placeholder="Enter your password"
                   className="w-full pl-9 pr-3 py-2.5 bg-[#faf9f6] border border-[#dadad7] focus:border-[#0d6e00] rounded-lg outline-none text-xs font-semibold text-[#141514] transition-all" />
               </div>
             </div>
@@ -140,12 +140,12 @@ export default function AuthView({ onAuthenticate }: AuthViewProps) {
             {isLoading ? (
               <>
                 <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
-                <span>{isSignUpMode ? "Registering Node..." : "Authorizing Session Token..."}</span>
+                <span>{isSignUpMode ? "Creating account..." : "Signing in..."}</span>
               </>
             ) : (
               <>
                 <span className="material-symbols-outlined text-sm text-[#44d62c] group-hover:scale-110 transition-transform">verified_user</span>
-                <span>{isSignUpMode ? "Register New Identity" : "Establish Secure Session"}</span>
+                <span>{isSignUpMode ? "Create Account" : "Log In"}</span>
               </>
             )}
           </button>
@@ -155,14 +155,14 @@ export default function AuthView({ onAuthenticate }: AuthViewProps) {
               onClick={() => { setErrorMsg(""); setPassword(""); setIsSignUpMode(!isSignUpMode); }}
               className="text-[11px] font-semibold text-[#0d6e00] hover:underline cursor-pointer"
             >
-              {isSignUpMode ? "Already a registered node? Sign In." : "Need to register a new identity? Sign Up."}
+              {isSignUpMode ? "Already have an account? Log in." : "New here? Create an account."}
             </button>
           </div>
         </form>
 
         <div className="border-t border-[#dadad7] pt-3 text-center">
           <p className="text-[9px] font-mono text-[#878884] uppercase tracking-wider">
-            Secured by SHA256 Encryption Protocols
+            Your account is protected
           </p>
         </div>
       </motion.div>

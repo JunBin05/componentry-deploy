@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { QuoteLineItem, ComponentItem, ComponentCategory } from "../types";
-import { useInventory } from "../context/InventoryContext";
 import { checkCompatibility } from "../services/pythonApi";
-import { ICON_MAP, displayName, hasSpecs } from "../services/quoteAdapter";
+import { ICON_MAP, displayName, hasSpecs, normalizeCategory } from "../services/quoteAdapter";
 
 interface SpecsVerifyViewProps {
   projectName: string;
@@ -13,6 +12,38 @@ interface SpecsVerifyViewProps {
   onDiscard: () => void;
 }
 
+const CATEGORY_KEYWORDS: Array<[ComponentCategory, string[]]> = [
+  ["CPU", ["cpu", "processor", "ryzen", "core i"]],
+  ["GPU", ["gpu", "graphics", "geforce", "radeon", "rtx", "rx "]],
+  ["Motherboard", ["motherboard", "mainboard", "b650", "x670", "z790", "b760"]],
+  ["RAM", ["ram", "memory", "ddr4", "ddr5"]],
+  ["Storage", ["storage", "ssd", "hdd", "nvme"]],
+  ["PSU", ["psu", "power supply", "watt", "850w", "1000w"]],
+  ["Cooling", ["cooler", "cooling", "aio", "air cooler"]],
+  ["Hardware", ["case", "chassis"]],
+];
+
+function inferSwapCategory(component: ComponentItem): ComponentCategory {
+  const normalized = normalizeCategory(component.category);
+  if (normalized !== "Hardware") return normalized;
+
+  const searchable = [
+    component.id,
+    component.sku,
+    component.part_name,
+    component.name,
+    component.icon,
+  ].join(" ").toLowerCase();
+
+  for (const [category, keywords] of CATEGORY_KEYWORDS) {
+    if (keywords.some((keyword) => searchable.includes(keyword))) {
+      return category;
+    }
+  }
+
+  return normalized;
+}
+
 export default function SpecsVerifyView({
   projectName,
   targetBudget,
@@ -21,7 +52,6 @@ export default function SpecsVerifyView({
   onConfirm,
   onDiscard
 }: SpecsVerifyViewProps) {
-  const { inventory } = useInventory();
   const [items, setItems] = useState<QuoteLineItem[]>(initialItems);
   const [editingProjectName, setEditingProjectName] = useState(projectName);
   const [swappingLineIdx, setSwappingLineIdx] = useState<number | null>(null);
@@ -61,7 +91,7 @@ export default function SpecsVerifyView({
     updated[lineIdx] = {
       ...updated[lineIdx],
       component: newComponent,
-      rationale: `Swapped by user. Alternative selection from ${newComponent.category} pool.`
+      rationale: `Changed by user to another ${newComponent.category} part.`
     };
     setItems(updated);
     setSwappingLineIdx(null);
@@ -108,7 +138,7 @@ export default function SpecsVerifyView({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="text-[10px] bg-[#e6f4ea] text-[#0d6e00] font-bold px-2 py-0.5 rounded font-mono uppercase tracking-wider">
-              Verification State
+              Review Quote
             </span>
           </div>
           <input
@@ -137,12 +167,12 @@ export default function SpecsVerifyView({
               {isVerifying ? (
                 <>
                   <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
-                  <span>Checking compatibility...</span>
+                  <span>Checking parts...</span>
                 </>
               ) : (
                 <>
                   <span className="material-symbols-outlined text-sm">offline_bolt</span>
-                  <span>Verify Changes</span>
+                  <span>Check Parts</span>
                 </>
               )}
             </button>
@@ -152,7 +182,7 @@ export default function SpecsVerifyView({
               className="px-5 py-2.5 bg-[#0d6e00] hover:bg-[#0b5c00] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
-              <span>Confirm & Generate Quotation</span>
+              <span>Confirm and Create Quote</span>
             </button>
           )}
         </div>
@@ -163,7 +193,7 @@ export default function SpecsVerifyView({
         <div className="flex justify-between items-baseline">
           <div>
             <p className="text-[10px] font-bold text-[#585956] uppercase tracking-wider">
-              Quote Estimate (Based on current component selections)
+              Quote Total
             </p>
             <h3 className="font-display font-bold text-2xl text-[#141514] tracking-tight mt-1">
               RM {totalCost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -172,7 +202,7 @@ export default function SpecsVerifyView({
 
           <div className="text-right">
             <p className="text-[10px] font-bold text-[#585956] uppercase tracking-wider">
-              Budget Utilization
+              Budget Used
             </p>
             <p className={`font-mono text-sm font-bold mt-1 ${isOverBudget ? "text-[#8a1a1a]" : "text-[#0d6e00]"}`}>
               {budgetUtilization.toFixed(0)}% <span className="text-[11px] font-sans font-normal text-[#585956]">of RM {targetBudget.toLocaleString()} limit</span>
@@ -193,24 +223,26 @@ export default function SpecsVerifyView({
         {isOverBudget && (
           <div className="flex items-center gap-2 p-2 px-3 rounded bg-red-50 border border-red-100 text-[11px] font-semibold text-[#8a1a1a]">
             <span className="material-symbols-outlined text-sm leading-none">error</span>
-            <span>Warning: Current hardware total exceeds Target Bracket. Recommended swap of core elements lower in cost.</span>
+            <span>This quote is over budget. Try swapping one or more parts for lower-priced options.</span>
           </div>
         )}
       </div>
 
       {/* Main Hardware Package Specifications List */}
-      <div className="rounded-xl border border-[#dadad7] bg-white overflow-hidden shadow-sm">
+      <div className="rounded-xl border border-[#dadad7] bg-white overflow-visible shadow-sm">
         <div className="p-4 bg-[#fbfbfa] border-b border-[#dadad7] flex items-center gap-2">
           <span className="material-symbols-outlined text-[18px] text-[#585956]">settings_suggest</span>
           <h4 className="font-display font-bold text-xs text-[#141514]">
-            Synthesized Component Configuration Table
+            Selected Parts
           </h4>
         </div>
 
         <div className="divide-y divide-[#dadad7]">
           {items.map((line, idx) => {
-            const alternatives = inventory
-              .filter(alt => alt.category === line.component.category && alt.id !== line.component.id)
+            const swapCategory = inferSwapCategory(line.component);
+            const alternatives = allCatalogItems
+              .filter((alt) => inferSwapCategory(alt) === swapCategory && alt.id !== line.component.id)
+              .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
               .map(alt => ({
                 id: alt.id,
                 name: alt.part_name,
@@ -246,7 +278,7 @@ export default function SpecsVerifyView({
                       </div>
                       <p className="font-sans font-bold text-sm text-[#141514]">{displayName(line.component)}</p>
 
-                      {/* AI Rationale block */}
+                      {/* Reason block */}
                       {line.rationale && (
                         <div className="mt-2.5 p-3 rounded-lg bg-[#faf9f6] border border-[#dadad7]/60 flex items-start gap-2.5 max-w-xl">
                           <span className="material-symbols-outlined text-xs text-[#0d6e00] bg-white rounded-full p-0.5 border border-[#dadad7] shrink-0 font-bold leading-none">
@@ -300,13 +332,13 @@ export default function SpecsVerifyView({
 
                         {/* Swap Inline Alternatives Drawer with elevated z-index */}
                         {swappingLineIdx === idx && (
-                          <div className="absolute right-0 mt-2 w-96 bg-white border border-[#dadad7] rounded-xl shadow-2xl z-50 p-4 space-y-3">
+                          <div className="absolute right-0 mt-2 w-[min(24rem,calc(100vw-3rem))] bg-white border border-[#dadad7] rounded-xl shadow-2xl z-50 p-4 space-y-3">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-[#585956] pb-2 border-b border-[#dadad7]">
-                              Compatible Alternatives Pool
+                              Other choices ({alternatives.length})
                             </p>
                             {alternatives.length === 0 ? (
                               <p className="text-xs text-[#878884] italic p-2 text-center">
-                                No compatible alternate specs in this catalog block.
+                                No other matching parts in this catalog.
                               </p>
                             ) : (
                               <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
@@ -348,7 +380,7 @@ export default function SpecsVerifyView({
                       <div className="flex items-center gap-2.5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
                         <span className="material-symbols-outlined text-base animate-pulse text-amber-600">report_problem</span>
                         <p className="font-medium">
-                          Component selection altered. Run <strong className="font-semibold text-amber-950">Verify Changes</strong> above to check socket, memory, power, cooling, and case compatibility.
+                          Part changed. Click <strong className="font-semibold text-amber-950">Check Parts</strong> above to make sure the parts work together.
                         </p>
                       </div>
                     )}
@@ -378,13 +410,13 @@ export default function SpecsVerifyView({
                                 updated[psuIdx] = {
                                   ...updated[psuIdx],
                                   component: targetPSU,
-                                  rationale: "Automatically upgraded to the strongest available PSU in the Supabase catalog."
+                                  rationale: "Changed to the strongest available PSU in the catalog."
                                 };
                               } else {
                                 updated.push({
                                   component: targetPSU,
                                   quantity: 1,
-                                  rationale: "Added the strongest available PSU in the Supabase catalog."
+                                  rationale: "Added the strongest available PSU in the catalog."
                                 });
                               }
                               setItems(updated);
@@ -398,7 +430,7 @@ export default function SpecsVerifyView({
                             className="px-3 py-1.5 bg-red-600 text-white rounded font-bold hover:bg-red-700 transition-colors flex items-center gap-1 cursor-pointer text-[11px]"
                           >
                             <span className="material-symbols-outlined text-[14px]">tune</span>
-                            <span>Auto-Select Strongest Catalog PSU</span>
+                            <span>Use Strongest PSU</span>
                           </button>
                         </div>
                       </div>
@@ -410,8 +442,8 @@ export default function SpecsVerifyView({
                         <div>
                           <p className="font-semibold leading-relaxed">
                             {hasSpecs(line.component.specs)
-                              ? (verificationSummary || "Compatibility verification passed.")
-                              : "The selected component needs catalog specs before compatibility can be fully verified."}
+                              ? (verificationSummary || "Parts work together.")
+                              : "This part needs full specs before we can check it."}
                           </p>
                           {verificationChecks.length > 0 && (
                             <div className="mt-2 space-y-1.5">

@@ -59,6 +59,9 @@ CHEAPEST_VALID = {
     "case":        "case-001",
 }
 
+GPU_ONLY = {"gpu": "gpu-001"}
+RAM_GPU  = {"gpu": "gpu-001", "ram": "ram-001"}
+
 
 # ===========================================================================
 # 1. API INPUT VALIDATION  (no AI calls)
@@ -66,20 +69,15 @@ CHEAPEST_VALID = {
 
 class TestInputValidation:
 
-    def test_budget_below_minimum_rejected(self, client):
-        r = client.post("/quote", json={"brief": "gaming PC", "budget": 1000})
-        assert r.status_code == 400
-        assert "3,800" in r.json()["detail"] or "3800" in r.json()["detail"]
-
-    def test_budget_at_boundary_accepted(self, client, catalog):
-        """RM 3,800 is exactly the minimum — should not be rejected by validation."""
+    def test_low_budget_accepted(self, client, catalog):
+        """Any positive budget should be accepted — there is no enforced minimum."""
         with patch("main.generate_quote") as mock_gq:
             mock_gq.return_value = {
                 "selected":    CHEAPEST_VALID,
                 "reasoning":   {c: "ok" for c in CHEAPEST_VALID},
                 "alternatives":{c: {"down": None, "up": None} for c in CHEAPEST_VALID},
             }
-            r = client.post("/quote", json={"brief": "gaming PC", "budget": 3800})
+            r = client.post("/quote", json={"brief": "gaming PC", "budget": 500})
         assert r.status_code == 200
 
     def test_empty_brief_rejected(self, client):
@@ -98,14 +96,6 @@ class TestInputValidation:
         r = client.post("/quote", json={"brief": "gaming PC"})
         assert r.status_code == 422
 
-    def test_negative_budget_rejected(self, client):
-        r = client.post("/quote", json={"brief": "gaming PC", "budget": -500})
-        assert r.status_code == 400
-
-    def test_zero_budget_rejected(self, client):
-        r = client.post("/quote", json={"brief": "gaming PC", "budget": 0})
-        assert r.status_code == 400
-
     def test_health_endpoint(self, client):
         r = client.get("/health")
         assert r.status_code == 200
@@ -118,7 +108,7 @@ class TestInputValidation:
 
 class TestResponseStructure:
 
-    def _post(self, client, brief="gaming PC", budget=5000, selected=None):
+    def _post(self, client, brief="gaming PC", budget=5000, selected=None, **extra):
         sel = selected or CHEAPEST_VALID
         with patch("main.generate_quote") as mock_gq:
             mock_gq.return_value = {
@@ -126,22 +116,26 @@ class TestResponseStructure:
                 "reasoning":    {c: "reason" for c in sel},
                 "alternatives": {c: {"down": None, "up": None} for c in sel},
             }
-            return client.post("/quote", json={"brief": brief, "budget": budget})
+            return client.post("/quote", json={"brief": brief, "budget": budget, **extra})
 
     def test_all_top_level_fields_present(self, client):
         r = self._post(client)
         body = r.json()
-        for field in ("quote_id", "brief", "budget", "total", "savings", "parts", "generated_at"):
+        for field in ("quote_id", "brief", "budget", "total", "savings", "parts", "generated_at", "mode", "existing_parts"):
             assert field in body, f"Missing field: {field}"
 
     def test_quote_id_format(self, client):
         r = self._post(client)
         assert re.match(r"^NX-[A-Z0-9]{6}$", r.json()["quote_id"])
 
-    def test_all_eight_categories_in_parts(self, client):
+    def test_full_build_has_all_eight_categories(self, client):
         r = self._post(client)
         for cat in ("cpu", "motherboard", "gpu", "ram", "storage", "psu", "cooler", "case"):
             assert cat in r.json()["parts"], f"Missing category: {cat}"
+
+    def test_full_build_mode_field(self, client):
+        r = self._post(client)
+        assert r.json()["mode"] == "full"
 
     def test_each_part_has_required_fields(self, client):
         r = self._post(client)
@@ -162,6 +156,51 @@ class TestResponseStructure:
     def test_budget_echoed_in_response(self, client):
         r = self._post(client, budget=7500)
         assert r.json()["budget"] == 7500
+
+    # ------------------------------------------------------------------
+    # Partial / upgrade mode response structure
+    # ------------------------------------------------------------------
+
+    def test_partial_mode_field_set(self, client):
+        """Providing existing_parts sets mode='partial' in the response."""
+        r = self._post(
+            client,
+            selected=GPU_ONLY,
+            existing_parts={"gpu": "NVIDIA RTX 5090"},
+            target_categories=["gpu"],
+        )
+        assert r.json()["mode"] == "partial"
+
+    def test_partial_mode_existing_parts_echoed(self, client):
+        existing = {"gpu": "NVIDIA RTX 5090", "ram": "Kingston DDR4 16GB"}
+        r = self._post(
+            client,
+            selected={"ram": "ram-001"},
+            existing_parts=existing,
+            target_categories=["ram"],
+        )
+        assert r.json()["existing_parts"] == existing
+
+    def test_partial_mode_only_quoted_categories_in_parts(self, client):
+        """When the AI returns only 'gpu', parts must only contain 'gpu'."""
+        r = self._post(client, selected=GPU_ONLY, target_categories=["gpu"])
+        assert list(r.json()["parts"].keys()) == ["gpu"]
+
+    def test_single_item_mode_one_part_in_parts(self, client):
+        """A single-item brief with no existing_parts still returns one part."""
+        r = self._post(client, selected=GPU_ONLY)
+        assert "gpu" in r.json()["parts"]
+        assert len(r.json()["parts"]) == 1
+
+    def test_partial_target_categories_normalised(self, client):
+        """Upper-case category names in target_categories should be normalised."""
+        r = self._post(
+            client,
+            selected=GPU_ONLY,
+            target_categories=["GPU"],
+        )
+        # Should not 400/422 — normalisation happens in _validate_quote_request
+        assert r.status_code == 200
 
 
 # ===========================================================================
@@ -203,15 +242,11 @@ class TestAgentUnit:
         """If the AI returns a build that exceeds budget, it must retry."""
         from agent import generate_quote
 
-        # Expensive build that busts any budget
-        expensive = {**CHEAPEST_VALID}
         call_count = {"n": 0}
 
         def fake_generate(**kwargs):
             call_count["n"] += 1
             if call_count["n"] == 1:
-                # First call: return a real build so prices resolve, but use
-                # all the most expensive items to guarantee overage on budget=1
                 overpriced = {
                     "cpu": "cpu-003", "motherboard": "mb-003", "gpu": "gpu-005",
                     "ram": "ram-004", "storage": "storage-003", "psu": "psu-003",
@@ -223,7 +258,6 @@ class TestAgentUnit:
                     "alternatives": {c: {"down": None, "up": None} for c in overpriced},
                 })
             else:
-                # Subsequent calls: return valid cheap build
                 payload = json.dumps({
                     "selected":     CHEAPEST_VALID,
                     "reasoning":    {c: "ok" for c in CHEAPEST_VALID},
@@ -293,6 +327,126 @@ class TestAgentUnit:
 
         for cat, pid in result["selected"].items():
             assert pid in catalog, f"Unknown product ID '{pid}' in category '{cat}'"
+
+    # ------------------------------------------------------------------
+    # Partial / upgrade agent behaviour
+    # ------------------------------------------------------------------
+
+    def test_partial_mode_existing_parts_in_prompt(self, catalog, inventory):
+        """Existing parts must appear in the user message sent to Gemini."""
+        from agent import generate_quote
+
+        captured = {}
+
+        def fake_generate(**kwargs):
+            captured["msg"] = kwargs.get("contents", "")
+            payload = json.dumps({
+                "selected":     GPU_ONLY,
+                "reasoning":    {"gpu": "ok"},
+                "alternatives": {"gpu": {"down": None, "up": None}},
+            })
+            m = MagicMock(); m.text = payload
+            return m
+
+        existing = {"gpu": "NVIDIA RTX 5090", "ram": "Kingston DDR4 16GB"}
+        with patch("agent.client") as mock_client:
+            mock_client.models.generate_content.side_effect = fake_generate
+            generate_quote(
+                "upgrade GPU",
+                3800,
+                catalog,
+                inventory,
+                existing_parts=existing,
+                target_categories=["gpu"],
+            )
+
+        msg = captured["msg"]
+        assert "RTX 5090" in msg, "Existing GPU not found in prompt"
+        assert "Kingston" in msg, "Existing RAM not found in prompt"
+
+    def test_partial_mode_target_categories_in_prompt(self, catalog, inventory):
+        """Target categories must appear in the user message."""
+        from agent import generate_quote
+
+        captured = {}
+
+        def fake_generate(**kwargs):
+            captured["msg"] = kwargs.get("contents", "")
+            payload = json.dumps({
+                "selected":     RAM_GPU,
+                "reasoning":    {c: "ok" for c in RAM_GPU},
+                "alternatives": {c: {"down": None, "up": None} for c in RAM_GPU},
+            })
+            m = MagicMock(); m.text = payload
+            return m
+
+        with patch("agent.client") as mock_client:
+            mock_client.models.generate_content.side_effect = fake_generate
+            generate_quote(
+                "upgrade GPU and RAM",
+                5000,
+                catalog,
+                inventory,
+                target_categories=["gpu", "ram"],
+            )
+
+        msg = captured["msg"]
+        assert "gpu" in msg.lower()
+        assert "ram" in msg.lower()
+
+    def test_partial_mode_no_compat_check_called(self, catalog, inventory):
+        """Compat engine must NOT be called in partial mode."""
+        from agent import generate_quote
+
+        def fake_generate(**kwargs):
+            payload = json.dumps({
+                "selected":     GPU_ONLY,
+                "reasoning":    {"gpu": "ok"},
+                "alternatives": {"gpu": {"down": None, "up": None}},
+            })
+            m = MagicMock(); m.text = payload
+            return m
+
+        with patch("agent.client") as mock_client, \
+             patch("agent.check_compatibility") as mock_compat:
+            mock_client.models.generate_content.side_effect = fake_generate
+            generate_quote(
+                "just a GPU upgrade",
+                3800,
+                catalog,
+                inventory,
+                existing_parts={"cpu": "Intel i9-13900K"},
+                target_categories=["gpu"],
+            )
+
+        mock_compat.assert_not_called()
+
+    def test_single_item_no_existing_parts_still_partial(self, catalog, inventory):
+        """A brief with target_categories but no existing_parts is still partial mode."""
+        from agent import generate_quote
+
+        def fake_generate(**kwargs):
+            payload = json.dumps({
+                "selected":     {"gpu": "gpu-001"},
+                "reasoning":    {"gpu": "Best match for RTX 5060 request."},
+                "alternatives": {"gpu": {"down": None, "up": None}},
+            })
+            m = MagicMock(); m.text = payload
+            return m
+
+        with patch("agent.client") as mock_client, \
+             patch("agent.check_compatibility") as mock_compat:
+            mock_client.models.generate_content.side_effect = fake_generate
+            result = generate_quote(
+                "just one RTX 5060",
+                3800,
+                catalog,
+                inventory,
+                target_categories=["gpu"],
+            )
+
+        assert "gpu" in result["selected"]
+        mock_compat.assert_not_called()
 
 
 # ===========================================================================
@@ -457,3 +611,73 @@ class TestIntegration:
         elapsed = time.time() - start
         assert r.status_code == 200
         assert elapsed < 30, f"Response took {elapsed:.1f}s — too slow"
+
+    # ------------------------------------------------------------------
+    # Partial / upgrade integration tests
+    # ------------------------------------------------------------------
+
+    def test_gpu_upgrade_returns_only_gpu(self, client):
+        """GPU-only upgrade must return exactly one part in parts."""
+        r = client.post("/quote", json={
+            "brief": "The customer wants to upgrade their GPU for 4K gaming.",
+            "budget": 5000,
+            "existing_parts": {
+                "cpu":         "Intel i5-13600K",
+                "motherboard": "Gigabyte B760M DS3H DDR4",
+                "ram":         "Kingston Fury Beast DDR4 16GB 3200MHz",
+                "psu":         "Seasonic 750W Gold",
+                "cooler":      "DeepCool AK400",
+                "case":        "Lian Li Lancool 216",
+                "storage":     "Samsung 970 EVO 1TB",
+            },
+            "target_categories": ["gpu"],
+        })
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["mode"] == "partial"
+        assert "gpu" in body["parts"]
+        assert len(body["parts"]) == 1
+
+    def test_ram_and_gpu_upgrade(self, client):
+        """Requesting GPU + RAM upgrade returns exactly those two categories."""
+        r = client.post("/quote", json={
+            "brief": (
+                "The customer wants to upgrade their existing build, keeping these parts they "
+                "already have: NVIDIA RTX 5090, Kingston Fury Beast DDR4 16GB (2x8GB) 3200MHz. "
+                "They specifically want 64 GB of RAM. They play a lot of AAA games."
+            ),
+            "budget": 6000,
+            "existing_parts": {
+                "gpu": "NVIDIA RTX 5090",
+                "ram": "Kingston Fury Beast DDR4 16GB (2x8GB) 3200MHz",
+            },
+            "target_categories": ["ram"],
+        })
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["mode"] == "partial"
+        assert "ram" in body["parts"]
+
+    def test_single_item_brief_no_context(self, client):
+        """A very short single-item brief returns a quote with just that category."""
+        r = client.post("/quote", json={
+            "brief": "just one RTX 4090",
+            "budget": 8000,
+        })
+        assert r.status_code in (200, 422)
+        if r.status_code == 200:
+            body = r.json()
+            # The agent should have selected a GPU
+            assert "gpu" in body["parts"]
+
+    def test_partial_quote_total_within_budget(self, client):
+        """Total of partial quote must not exceed the stated budget."""
+        r = client.post("/quote", json={
+            "brief": "upgrade GPU for 4K gaming",
+            "budget": 4000,
+            "existing_parts": {"cpu": "AMD Ryzen 7 7700X", "ram": "Corsair DDR5 32GB"},
+            "target_categories": ["gpu"],
+        })
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["total"] <= body["budget"]

@@ -27,7 +27,7 @@ export default function Sidebar({ currentTab, onTabChange, isAuthenticated, onLo
             Componentry
           </h1>
           <span className="text-[10px] font-mono text-[#585956] tracking-widest uppercase">
-            AI CPQ SYSTEM
+            Quote Builder
           </span>
         </div>
       </div>
@@ -56,7 +56,7 @@ export default function Sidebar({ currentTab, onTabChange, isAuthenticated, onLo
               <span>{item.label}</span>
               {item.id === "specs" && (
                 <span className="ml-auto text-[9px] font-mono bg-[#0d6e00] text-white px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
-                  Engine
+                  Quote
                 </span>
               )}
             </button>
@@ -77,7 +77,7 @@ export default function Sidebar({ currentTab, onTabChange, isAuthenticated, onLo
                   Supplier Admin
                 </p>
                 <p className="text-[10px] font-mono text-[#585956] truncate mt-0.5">
-                  LEVEL: AUTH_VERIFIED
+                  Signed in
                 </p>
               </div>
             </div>
@@ -86,7 +86,7 @@ export default function Sidebar({ currentTab, onTabChange, isAuthenticated, onLo
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-[#dadad7] text-xs font-semibold text-[#8a1a1a] hover:bg-[#faeae8] hover:border-[#eba1a1] transition-all bg-[#faf9f6]"
             >
               <span className="material-symbols-outlined text-sm">logout</span>
-              <span>Disconnect Gateway</span>
+              <span>Log out</span>
             </button>
           </div>
         ) : (
@@ -95,7 +95,7 @@ export default function Sidebar({ currentTab, onTabChange, isAuthenticated, onLo
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-[#141514] hover:bg-black text-[#faf9f6] text-xs font-semibold shadow-sm transition-all duration-200"
           >
             <span className="material-symbols-outlined text-sm text-[#44d62c]">lock_open</span>
-            <span>Supplier Auth Portal</span>
+            <span>Log in</span>
           </button>
         )}
       </div>

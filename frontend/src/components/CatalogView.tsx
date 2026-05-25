@@ -8,6 +8,7 @@ export default function CatalogView() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form states for adding/editing
   const [formId, setFormId] = useState<string | null>(null);
@@ -56,41 +57,53 @@ export default function CatalogView() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName || !formSku || !formPrice) return;
-
-    const payload = {
-      part_name: formName,
-      sku: formSku,
-      price: parseFloat(formPrice) || 0,
-      category: formCategory,
-      stock_level: parseInt(formStock) || 0,
-      icon: formIcon || iconForCategory(formCategory),
-    };
-
-    if (formId) {
-      // Edit
-      const { error } = await supabase
-        .from("catalog")
-        .update(payload)
-        .eq("id", formId);
-      if (!error) {
-        await refreshInventory();
-      } else {
-        console.error("Error updating item", error);
-      }
-    } else {
-      // Add
-      const { error } = await supabase
-        .from("catalog")
-        .insert([payload]);
-      if (!error) {
-        await refreshInventory();
-      } else {
-        console.error("Error adding item", error);
-      }
+    if (!formName.trim() || !formSku.trim() || formPrice === "") {
+      alert("Please fill out all required fields (Name, SKU, Price).");
+      return;
     }
 
-    setIsModalOpen(false);
+    setIsSaving(true);
+    try {
+      const payload = {
+        part_name: formName.trim(),
+        sku: formSku.trim(),
+        price: parseFloat(formPrice) || 0,
+        category: formCategory,
+        stock_level: parseInt(formStock) || 0,
+        icon: formIcon || iconForCategory(formCategory),
+      };
+
+      if (formId) {
+        // Edit
+        const { error } = await supabase
+          .from("catalog")
+          .update(payload)
+          .eq("id", formId);
+        if (!error) {
+          await refreshInventory();
+        } else {
+          console.error("Error updating item", error);
+          alert(`Error updating item: ${error.message}`);
+          return;
+        }
+      } else {
+        // Add
+        const { error } = await supabase
+          .from("catalog")
+          .insert([payload]);
+        if (!error) {
+          await refreshInventory();
+        } else {
+          console.error("Error adding item", error);
+          alert(`Error adding item: ${error.message}`);
+          return;
+        }
+      }
+
+      setIsModalOpen(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteItem = async (id: string) => {
@@ -126,10 +139,10 @@ export default function CatalogView() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="font-display font-bold text-xl text-[#141514] tracking-tight">
-            Catalog Management
+            Catalog
           </h2>
           <p className="text-xs text-[#585956]">
-            Manage hardware components, configure dynamic pricing, and monitor secure inventory levels.
+            Manage parts, prices, and stock levels.
           </p>
         </div>
 
@@ -138,7 +151,7 @@ export default function CatalogView() {
           className="px-4 py-2.5 rounded-lg bg-[#0d6e00] hover:bg-[#0b5c00] text-white font-sans text-xs font-semibold shadow-sm hover:shadow transition-all flex items-center gap-2 group shrink-0"
         >
           <span className="material-symbols-outlined text-sm font-bold transition-transform group-hover:scale-110">add_circle</span>
-          <span>New Catalog Item</span>
+          <span>Add Part</span>
         </button>
       </div>
 
@@ -182,7 +195,7 @@ export default function CatalogView() {
           <thead>
             <tr className="bg-[#fbfbfa] border-b border-[#dadad7] text-[10px] font-bold text-[#585956] uppercase tracking-wider">
               <th className="px-5 py-3 w-12"></th>
-              <th className="px-5 py-3">Component / Specs</th>
+              <th className="px-5 py-3">Part</th>
               <th className="px-5 py-3">Category</th>
               <th className="px-5 py-3 text-center">Stock Level</th>
               <th className="px-5 py-3 text-right">Price (RM)</th>
@@ -193,7 +206,7 @@ export default function CatalogView() {
             {filteredItems.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-5 py-12 text-center text-xs font-semibold text-[#585956]">
-                  No matching parts identified in selected catalog filters.
+                  No matching parts found.
                 </td>
               </tr>
             ) : (
@@ -238,7 +251,7 @@ export default function CatalogView() {
                         ) : isLowStock ? (
                           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#fffdf0] text-[#856404] border border-[#ffeeba]/50">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#f39c12] animate-pulse"></span>
-                            Critical: {it.stock_level} Left
+                            Low: {it.stock_level} left
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#e2f3df] text-[#137333] border border-[#bcdeb5]/50 font-mono">
@@ -265,14 +278,14 @@ export default function CatalogView() {
                         <button
                           onClick={() => handleOpenEditModal(it)}
                           className="p-1 rounded text-gray-500 hover:text-black hover:bg-gray-100 transition-colors cursor-pointer"
-                          title="Edit Specs"
+                          title="Edit part"
                         >
                           <span className="material-symbols-outlined text-sm font-semibold">edit</span>
                         </button>
                         <button
                           onClick={() => handleDeleteItem(it.id)}
                           className="p-1 rounded text-red-450 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                          title="Delete Item"
+                          title="Delete part"
                         >
                           <span className="material-symbols-outlined text-sm font-semibold">delete</span>
                         </button>
@@ -295,7 +308,7 @@ export default function CatalogView() {
           >
             <div className="flex justify-between items-center pb-3 border-b border-[#dadad7]">
               <h3 className="font-display font-bold text-sm text-[#141514]">
-                Configure Catalog Specifications
+                Add or Edit Part
               </h3>
               <button
                 type="button"
@@ -323,7 +336,7 @@ export default function CatalogView() {
               {/* SKU & Price */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="uppercase tracking-wider">SKU Core</label>
+                  <label className="uppercase tracking-wider">SKU</label>
                   <input
                     type="text"
                     required
@@ -350,7 +363,7 @@ export default function CatalogView() {
 
               {/* Category selector */}
               <div className="space-y-1">
-                <label className="uppercase tracking-wider">Component Category</label>
+                <label className="uppercase tracking-wider">Category</label>
                 <select
                   value={formCategory}
                   onChange={(e) => handleFormCategoryChange(e.target.value)}
@@ -368,7 +381,7 @@ export default function CatalogView() {
 
               {/* Stock Input */}
               <div className="space-y-1">
-                <label className="uppercase tracking-wider">Initial Stock Units</label>
+                <label className="uppercase tracking-wider">Stock Quantity</label>
                 <input
                   type="number"
                   required
@@ -390,9 +403,10 @@ export default function CatalogView() {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#0d6e00] hover:bg-[#0b5c00] text-white rounded-md transition-colors shadow-sm"
+                disabled={isSaving}
+                className="px-4 py-2 bg-[#0d6e00] hover:bg-[#0b5c00] text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[170px]"
               >
-                Save Component Parameters
+                {isSaving ? "Saving..." : "Save Part"}
               </button>
             </div>
           </form>

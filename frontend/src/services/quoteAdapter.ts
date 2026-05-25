@@ -82,30 +82,32 @@ export function adaptPyQuoteToLineItems(
   supabaseInventory: ComponentItem[]
 ): QuoteLineItem[] {
   return Object.entries(response.parts).map(([category, part]) => {
-    const mappedCategory = normalizeCategory(part.category || category);
     const matched = supabaseInventory.find((item) => {
       return (
         item.id === part.id ||
-        normalizeSku(item.sku) === normalizeSku(part.sku) ||
-        normalizeSku(item.sku) === normalizeSku(part.id)
+        (item.sku && part.sku && normalizeSku(item.sku) === normalizeSku(part.sku)) ||
+        (item.sku && normalizeSku(item.sku) === normalizeSku(part.id))
       );
     });
 
+    // If matched in database, absolutely trust database category over LLM hallucinated keys
+    const finalCategory = matched ? matched.category : normalizeCategory(part.category || category);
+
     const component: ComponentItem = matched ? {
       ...matched,
-      category: mappedCategory,
-      icon: normalizeIcon(matched.icon || part.icon, mappedCategory),
-      specs: hasSpecs(matched.specs) ? matched.specs : part.specs,
+      category: finalCategory,
+      icon: normalizeIcon(matched.icon || part.icon, finalCategory),
+      specs: hasSpecs(matched.specs) ? matched.specs : (part.specs || {}),
     } : {
       id: part.id,
-      name: part.name,
-      part_name: part.part_name || part.name,
+      name: part.name || "",
+      part_name: part.part_name || part.name || "",
       sku: part.sku || part.id.toUpperCase(),
-      price: part.price,
-      category: mappedCategory,
-      icon: normalizeIcon(part.icon, mappedCategory),
+      price: part.price || 0,
+      category: finalCategory,
+      icon: normalizeIcon(part.icon, finalCategory),
       stock_level: part.stock_level ?? 0,
-      specs: part.specs,
+      specs: part.specs || {},
     };
 
     return {

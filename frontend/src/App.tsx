@@ -25,10 +25,10 @@ export default function App() {
   const [specsFlowState, setSpecsFlowState] = useState<"input" | "loading" | "verify" | "preview">("input");
 
   // Synthetic specs current state
-  const [synthProjectName, setSynthProjectName] = useState("Enterprise AI Workstation");
+  const [synthProjectName, setSynthProjectName] = useState("Workstation Quote");
   const [synthTargetBudget, setSynthTargetBudget] = useState(15000);
   const [synthLineItems, setSynthLineItems] = useState<QuoteLineItem[]>([]);
-  const [processingStatus, setProcessingStatus] = useState("Initializing quote engine...");
+  const [processingStatus, setProcessingStatus] = useState("Starting your quote...");
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null);
 
   // Authenticated State
@@ -113,7 +113,7 @@ export default function App() {
       if (session?.user) {
         setIsAuthenticated(true);
         setSupplierEmail(session.user.email || "");
-        setSupplierNode("Supplier Node (Supabase Authenticated)");
+        setSupplierNode("Signed in");
         setUserId(session.user.id);
         await loadUserSettings(session.user.id);
         await loadUserQuotes(session.user.id);
@@ -124,7 +124,7 @@ export default function App() {
         if (event === "SIGNED_IN" && session?.user) {
           setIsAuthenticated(true);
           setSupplierEmail(session.user.email || "");
-          setSupplierNode("Supplier Node (Supabase Authenticated)");
+          setSupplierNode("Signed in");
           setUserId(session.user.id);
           await loadUserSettings(session.user.id);
           await loadUserQuotes(session.user.id);
@@ -166,15 +166,10 @@ export default function App() {
 
   // 2. AI Synthesis Flow Trigger
   const handleGenerateSpecifications = async (promptText: string, budgetLimit: number) => {
-    if (budgetLimit < 3800) {
-      alert("Minimum budget is RM 3,800. Please increase your target budget.");
-      return;
-    }
-
     setSynthTargetBudget(budgetLimit);
     setActiveQuoteId(null);
     setSpecsFlowState("loading");
-    setProcessingStatus("Connecting to Python quote engine...");
+    setProcessingStatus("Preparing your quote...");
 
     try {
       for await (const event of streamQuote({ brief: promptText, budget: budgetLimit })) {
@@ -183,7 +178,7 @@ export default function App() {
         }
 
         if (event.step === "result" && event.data) {
-          setSynthProjectName("AI-Optimized Hardware Quote");
+          setSynthProjectName("Recommended Hardware Quote");
           setSynthLineItems(adaptPyQuoteToLineItems(event.data, inventory));
           setSpecsFlowState("verify");
           return;
@@ -196,7 +191,7 @@ export default function App() {
     } catch (e) {
       console.error("Error generating specifications via Python backend.", e);
       setSpecsFlowState("input");
-      alert("Failed to generate quote. Check that the Python backend is running on port 8000.");
+      alert("Could not create the quote. Please check that the backend is running on port 8000.");
     }
   };
 
@@ -417,7 +412,7 @@ export default function App() {
           </div>
           {/* Progress bar */}
           <div className="w-full space-y-2">
-            <p className="text-[11px] text-[#878884] font-semibold tracking-wide uppercase">Entering dashboard in 3s...</p>
+            <p className="text-[11px] text-[#878884] font-semibold tracking-wide uppercase">Opening dashboard in 3s...</p>
             <div className="w-full h-1.5 bg-[#e8e8e5] rounded-full overflow-hidden">
               <div className="h-full bg-[#0d6e00] rounded-full" style={{ animation: "shrink 3s linear forwards" }} />
             </div>
@@ -427,7 +422,7 @@ export default function App() {
             onClick={() => setWelcomePending(false)}
             className="text-[12px] font-semibold text-[#0d6e00] hover:underline cursor-pointer"
           >
-            Enter dashboard now →
+            Enter dashboard now
           </button>
         </div>
       </div>
