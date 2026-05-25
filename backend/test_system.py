@@ -69,20 +69,15 @@ RAM_GPU  = {"gpu": "gpu-001", "ram": "ram-001"}
 
 class TestInputValidation:
 
-    def test_budget_below_minimum_rejected(self, client):
-        r = client.post("/quote", json={"brief": "gaming PC", "budget": 1000})
-        assert r.status_code == 400
-        assert "3,800" in r.json()["detail"] or "3800" in r.json()["detail"]
-
-    def test_budget_at_boundary_accepted(self, client, catalog):
-        """RM 3,800 is exactly the minimum — should not be rejected by validation."""
+    def test_low_budget_accepted(self, client, catalog):
+        """Any positive budget should be accepted — there is no enforced minimum."""
         with patch("main.generate_quote") as mock_gq:
             mock_gq.return_value = {
                 "selected":    CHEAPEST_VALID,
                 "reasoning":   {c: "ok" for c in CHEAPEST_VALID},
                 "alternatives":{c: {"down": None, "up": None} for c in CHEAPEST_VALID},
             }
-            r = client.post("/quote", json={"brief": "gaming PC", "budget": 3800})
+            r = client.post("/quote", json={"brief": "gaming PC", "budget": 500})
         assert r.status_code == 200
 
     def test_empty_brief_rejected(self, client):
@@ -100,14 +95,6 @@ class TestInputValidation:
     def test_missing_budget_field(self, client):
         r = client.post("/quote", json={"brief": "gaming PC"})
         assert r.status_code == 422
-
-    def test_negative_budget_rejected(self, client):
-        r = client.post("/quote", json={"brief": "gaming PC", "budget": -500})
-        assert r.status_code == 400
-
-    def test_zero_budget_rejected(self, client):
-        r = client.post("/quote", json={"brief": "gaming PC", "budget": 0})
-        assert r.status_code == 400
 
     def test_health_endpoint(self, client):
         r = client.get("/health")

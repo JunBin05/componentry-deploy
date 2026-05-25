@@ -195,8 +195,6 @@ def _validate_quote_request(req: QuoteRequest) -> None:
     result is written back onto req so both route handlers see it without
     any further changes.
     """
-    if req.budget < 3800:
-        raise HTTPException(400, "Minimum budget is RM 3,800.")
     if not req.brief.strip():
         raise HTTPException(400, "Brief cannot be empty.")
 

@@ -166,11 +166,6 @@ export default function App() {
 
   // 2. AI Synthesis Flow Trigger
   const handleGenerateSpecifications = async (promptText: string, budgetLimit: number) => {
-    if (budgetLimit < 3800) {
-      alert("Minimum budget is RM 3,800. Please increase your target budget.");
-      return;
-    }
-
     setSynthTargetBudget(budgetLimit);
     setActiveQuoteId(null);
     setSpecsFlowState("loading");
