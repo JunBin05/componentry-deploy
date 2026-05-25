@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import asyncio, json, random, string, time
 from typing import Any
 from agent import generate_quote
+from brief_parser import parse_brief
 from catalog_store import display_category, load_catalog, normalize_category
 from compat import check_compatibility
 
@@ -14,9 +15,20 @@ app.add_middleware(CORSMiddleware,
                    allow_methods=["*"],
                    allow_headers=["*"])
 
+
 class QuoteRequest(BaseModel):
     brief:  str
     budget: float
+    # Optional — when provided, the agent runs in partial/upgrade mode.
+    # existing_parts: free-text or minimal dict descriptions of parts the
+    #   client already owns, keyed by category.  The LLM uses these for
+    #   context (socket/RAM compatibility) but they are NOT included in
+    #   the quote output.
+    # target_categories: explicit list of categories to quote.  If omitted
+    #   the LLM infers them from the brief.
+    existing_parts:     dict[str, Any] | None = None
+    target_categories:  list[str] | None      = None
+
 
 class CompatRequest(BaseModel):
     items: list[dict]
@@ -164,20 +176,55 @@ def build_quote_response(req: QuoteRequest, result: dict, catalog: dict) -> dict
         "budget": req.budget,
         "total": total,
         "savings": req.budget - total,
+        # mode is stamped by the agent onto result — it knows which prompt ran
+        "mode": result.get("mode", "full"),
+        # warnings is non-empty when the agent returned its best imperfect build.
+        # The frontend should surface these as a visible caveat.
+        "warnings": result.get("warnings", []),
+        "existing_parts": req.existing_parts or {},
         "parts": enriched,
         "generated_at": time.strftime("%Y-%m-%d %H:%M")
     }
 
-@app.post("/quote")
-async def create_quote(req: QuoteRequest):
+def _validate_quote_request(req: QuoteRequest) -> None:
+    """
+    Shared validation for both /quote and /quote/stream.
+
+    Also runs the brief parser when the caller has not supplied structured
+    intent fields (i.e. a plain frontend text-field submission). The parser
+    result is written back onto req so both route handlers see it without
+    any further changes.
+    """
     if req.budget < 3800:
         raise HTTPException(400, "Minimum budget is RM 3,800.")
     if not req.brief.strip():
         raise HTTPException(400, "Brief cannot be empty.")
 
+    # If the caller already sent structured fields, normalise and trust them.
+    # Otherwise run the brief parser to extract intent from the free text.
+    if req.existing_parts is not None or req.target_categories is not None:
+        if req.target_categories is not None:
+            normalised = [normalize_category(c) for c in req.target_categories]
+            req.target_categories = [c for c in normalised if c]
+    else:
+        parsed = parse_brief(req.brief)
+        req.existing_parts    = parsed["existing_parts"]    # {} for full builds
+        req.target_categories = parsed["target_categories"] # [] for full builds
+
+@app.post("/quote")
+async def create_quote(req: QuoteRequest):
+    _validate_quote_request(req)
+
     try:
         catalog, inventory = load_catalog(require_specs=True)
-        result = generate_quote(req.brief, req.budget, catalog, inventory)
+        result = generate_quote(
+            req.brief,
+            req.budget,
+            catalog,
+            inventory,
+            existing_parts=req.existing_parts,
+            target_categories=req.target_categories,
+        )
     except ValueError as e:
         raise HTTPException(422, str(e))
     except RuntimeError as e:
@@ -187,10 +234,7 @@ async def create_quote(req: QuoteRequest):
 
 @app.post("/quote/stream")
 async def stream_quote(req: QuoteRequest):
-    if req.budget < 3800:
-        raise HTTPException(400, "Minimum budget is RM 3,800.")
-    if not req.brief.strip():
-        raise HTTPException(400, "Brief cannot be empty.")
+    _validate_quote_request(req)
 
     async def event_stream():
         queue: asyncio.Queue = asyncio.Queue()
@@ -204,7 +248,15 @@ async def stream_quote(req: QuoteRequest):
                 catalog, inventory = load_catalog(require_specs=True)
                 result = await loop.run_in_executor(
                     None,
-                    lambda: generate_quote(req.brief, req.budget, catalog, inventory, on_status),
+                    lambda: generate_quote(
+                        req.brief,
+                        req.budget,
+                        catalog,
+                        inventory,
+                        on_status,
+                        existing_parts=req.existing_parts,
+                        target_categories=req.target_categories,
+                    ),
                 )
                 final = build_quote_response(req, result, catalog)
                 await queue.put({"step": "result", "data": final})
