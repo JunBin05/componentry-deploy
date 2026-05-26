@@ -1,4 +1,4 @@
-export type ComponentCategory = 'CPU' | 'GPU' | 'Motherboard' | 'RAM' | 'Storage' | 'PSU' | 'Cooling' | 'Hardware';
+export type ComponentCategory = 'CPU' | 'GPU' | 'Motherboard' | 'RAM' | 'Storage' | 'PSU' | 'Cooling' | 'Case';
 
 export interface ComponentItem {
   id: string;

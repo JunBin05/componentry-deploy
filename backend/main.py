@@ -33,7 +33,7 @@ class QuoteRequest(BaseModel):
 class CompatRequest(BaseModel):
     items: list[dict]
 
-COMPAT_REQUIRED_CATEGORIES = {"cpu", "motherboard", "gpu", "ram", "psu", "cooler", "case"}
+COMPAT_REQUIRED_CATEGORIES = {"cpu", "motherboard", "gpu", "ram", "psu", "cooler"}
 
 def _catalog_lookup(catalog: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     lookup = {}

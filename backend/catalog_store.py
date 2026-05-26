@@ -39,7 +39,7 @@ DISPLAY_CATEGORY = {
     "storage": "Storage",
     "psu": "PSU",
     "cooler": "Cooling",
-    "case": "Hardware",
+    "case": "Case",
 }
 
 
@@ -50,7 +50,7 @@ def normalize_category(category: str | None) -> str:
 
 def display_category(category: str | None) -> str:
     normalized = normalize_category(category)
-    return DISPLAY_CATEGORY.get(normalized, category or "Hardware")
+    return DISPLAY_CATEGORY.get(normalized, category or "Case")
 
 
 def _coerce_price(value: Any) -> float:

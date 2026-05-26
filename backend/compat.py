@@ -30,7 +30,7 @@ def check_compatibility(parts: dict) -> list[str]:
     case_s = parts.get("case",        {}).get("specs", {})
 
     # Guard — flag any missing required categories before running rules
-    required_categories = ["cpu", "motherboard", "gpu", "ram", "psu", "cooler", "case"]
+    required_categories = ["cpu", "motherboard", "gpu", "ram", "psu", "cooler"]
     missing = [c for c in required_categories if c not in parts]
     if missing:
         errors.append(f"Missing required categories: {', '.join(missing)}.")

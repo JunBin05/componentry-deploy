@@ -10,8 +10,8 @@ const CATEGORY_MAP: Record<string, ComponentCategory> = {
   psu: "PSU",
   cooler: "Cooling",
   cooling: "Cooling",
-  case: "Hardware",
-  hardware: "Hardware",
+  case: "Case",
+  hardware: "Case",
 };
 
 export const ICON_MAP: Record<string, string> = {
@@ -22,7 +22,7 @@ export const ICON_MAP: Record<string, string> = {
   Storage: "storage",
   PSU: "power",
   Cooling: "ac_unit",
-  Hardware: "inventory_2",
+  Case: "inventory_2",
 };
 
 const ICON_ALIASES: Record<string, string> = {
@@ -66,7 +66,7 @@ function normalizeSku(value?: string): string {
 }
 
 export function normalizeCategory(category?: string | null): ComponentCategory {
-  return CATEGORY_MAP[(category || "").toLowerCase()] ?? "Hardware";
+  return CATEGORY_MAP[(category || "").toLowerCase()] ?? "Case";
 }
 
 export function hasSpecs(specs?: Record<string, unknown> | null): boolean {

@@ -30,7 +30,7 @@ CATEGORY_MAP = {
     "storage": "Storage",
     "psu": "PSU",
     "cooler": "Cooling",
-    "case": "Hardware",
+    "case": "Case",
 }
 
 ICON_MAP = {
