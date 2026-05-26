@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { QuoteLineItem, SupplierConfig, QuoteStatus } from "../types";
 import { displayName } from "../services/quoteAdapter";
 
@@ -13,6 +13,108 @@ interface SpecsPreviewViewProps {
   onStatusChange?: (nextStatus: QuoteStatus) => Promise<void>;
 }
 
+// ---------------------------------------------------------------------------
+// InlineEditField — renders as styled text; becomes an input on click
+// ---------------------------------------------------------------------------
+interface InlineEditFieldProps {
+  value: string;
+  onChange: (val: string) => void;
+  className?: string;         // applied to both the display span and the input
+  inputClassName?: string;    // extra classes only for the input element
+  multiline?: boolean;
+  placeholder?: string;
+}
+
+function InlineEditField({
+  value,
+  onChange,
+  className = "",
+  inputClassName = "",
+  multiline = false,
+  placeholder = "Click to edit",
+}: InlineEditFieldProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+
+  // Keep draft in sync if parent value changes externally
+  useEffect(() => { setDraft(value); }, [value]);
+
+  const startEdit = () => {
+    setDraft(value);
+    setEditing(true);
+  };
+
+  const commit = () => {
+    setEditing(false);
+    onChange(draft.trim() || value); // don't allow blanking out
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !multiline) { e.preventDefault(); commit(); }
+    if (e.key === "Escape") { setEditing(false); setDraft(value); }
+  };
+
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus();
+  }, [editing]);
+
+  const baseInput =
+    "bg-[#f0f7ee] border border-[#bcdeb5] rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-[#0d6e00]/30 focus:border-[#0d6e00] transition-all w-full print:bg-transparent print:border-transparent";
+
+  if (editing) {
+    if (multiline) {
+      return (
+        <textarea
+          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
+          rows={2}
+          className={`${baseInput} resize-none ${className} ${inputClassName}`}
+        />
+      );
+    }
+    return (
+      <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className={`${baseInput} ${className} ${inputClassName}`}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={startEdit}
+      title="Click to edit"
+      className={`
+        cursor-text rounded px-1 py-0.5 -mx-1
+        hover:bg-[#edf7ea] hover:text-[#0d5c00]
+        border border-transparent hover:border-[#bcdeb5]
+        transition-all group relative
+        print:hover:bg-transparent print:hover:border-transparent print:cursor-default
+        ${className}
+      `}
+    >
+      {value || <span className="text-[#bccbb3] italic">{placeholder}</span>}
+      {/* pencil hint icon — hidden in print */}
+      <span className="material-symbols-outlined text-[10px] text-[#0d6e00] opacity-0 group-hover:opacity-70 ml-1 align-middle select-none transition-opacity print:hidden">
+        edit
+      </span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export default function SpecsPreviewView({
   projectName,
   items,
@@ -21,20 +123,26 @@ export default function SpecsPreviewView({
   settings,
   onFinish,
   quoteStatus,
-  onStatusChange
+  onStatusChange,
 }: SpecsPreviewViewProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const subtotal = items.reduce((sum, item) => sum + (item.component.price * item.quantity), 0);
+  // Editable client / project fields (initialised from props / former hardcodes)
+  const [clientCompanyName, setClientCompanyName] = useState(customerName || "Neural Nexus Corp Sdn Bhd");
+  const [clientDepartment, setClientDepartment] = useState("IT Procurement Division");
+  const [clientContactName, setClientContactName] = useState("Elena Rostova");
+  const [editableProjectName, setEditableProjectName] = useState(projectName || "Custom Build Project");
+
+  const subtotal = items.reduce((sum, item) => sum + item.component.price * item.quantity, 0);
   const grandTotal = subtotal;
 
   const quoteNumber = `${settings.customQuotePrefix || "TRD"}-${Math.floor(100000 + Math.random() * 900000)}`;
   const currentDate = new Date().toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 
   const handleShare = () => {
@@ -68,7 +176,7 @@ export default function SpecsPreviewView({
             Quotation Preview
           </h2>
           <p className="text-xs text-[#585956]">
-            Review the quote before saving or sending it to the client.
+            Click any client or project field on the quote to edit it before saving.
           </p>
         </div>
 
@@ -96,9 +204,13 @@ export default function SpecsPreviewView({
                         : "text-[#585956] hover:bg-[#f5f4ef] cursor-pointer hover:text-black border-r border-[#dadad7] last:border-0"
                     }`}
                   >
-                    {status === "Draft" ? "Draft" : 
-                     status === "Sent" ? "Mark as Sent" :
-                     status === "Approved" ? "Approved" : "Declined"}
+                    {status === "Draft"
+                      ? "Draft"
+                      : status === "Sent"
+                      ? "Mark as Sent"
+                      : status === "Approved"
+                      ? "Approved"
+                      : "Declined"}
                   </button>
                 ))}
               </div>
@@ -146,10 +258,16 @@ export default function SpecsPreviewView({
         </div>
       </div>
 
+      {/* Editable field hint banner — screen only */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#f0f7ee] border border-[#bcdeb5] text-[11px] font-semibold text-[#0d5c00] print:hidden">
+        <span className="material-symbols-outlined text-sm">edit_note</span>
+        <span>Client and project fields are editable — click any highlighted field on the quote below to change it.</span>
+      </div>
+
       {/* A4 White Paper Container */}
       <div className="max-w-4xl mx-auto bg-white border border-[#dadad7] shadow-xl p-8 sm:p-12 font-sans text-xs text-[#1a1c1a] leading-relaxed relative min-h-[1050px] flex flex-col justify-between print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:max-w-none">
-        
-        {/* Top strip banner overlay */}
+
+        {/* Top strip */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#0d6e00] print:hidden"></div>
 
         <div className="space-y-8">
@@ -157,9 +275,7 @@ export default function SpecsPreviewView({
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="material-symbols-outlined text-[#0d6e00] text-3xl font-bold">
-                  memory
-                </span>
+                <span className="material-symbols-outlined text-[#0d6e00] text-3xl font-bold">memory</span>
                 <span className="font-display font-bold text-lg tracking-tight uppercase">
                   {settings.companyName || "TechRigs Distribution Sdn Bhd"}
                 </span>
@@ -168,7 +284,8 @@ export default function SpecsPreviewView({
                 {settings.businessAddress || "Level 3, Plaza Low Yat, Bukit Bintang\n55100 Kuala Lumpur"}
               </p>
               <p className="text-[#585956] text-[11px] mt-1">
-                Phone: {settings.contactNumber || "+60 3-2142 0000"} | Email: {settings.supportEmail || "quotes@techrigs.com.my"}
+                Phone: {settings.contactNumber || "+60 3-2142 0000"} | Email:{" "}
+                {settings.supportEmail || "quotes@techrigs.com.my"}
               </p>
             </div>
 
@@ -186,33 +303,72 @@ export default function SpecsPreviewView({
                   {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
                     month: "long",
                     day: "numeric",
-                    year: "numeric"
+                    year: "numeric",
                   })}
                 </span>
               </div>
             </div>
           </div>
 
+          {/* Client & Project Details — all editable */}
           <div className="border-t border-[#dadad7] pt-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Left: Quotation Prepared For */}
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#878884] mb-1.5">
                 Quotation Prepared For:
               </h3>
-              <p className="font-bold text-[#141514] text-sm">{customerName}</p>
-              <p className="text-[#585956] mt-0.5">IT Procurement Division</p>
-              <p className="text-[#585956] text-[11px] mt-1">Client Contact: Elena Rostova</p>
-              <p className="text-[#585956] text-[11px]">Neural Nexus Corp Sdn Bhd</p>
+
+              {/* Company name — bold, larger */}
+              <p className="font-bold text-[#141514] text-sm">
+                <InlineEditField
+                  value={clientCompanyName}
+                  onChange={setClientCompanyName}
+                  className="font-bold text-sm text-[#141514]"
+                  placeholder="Company name"
+                />
+              </p>
+
+              {/* Department */}
+              <p className="text-[#585956] mt-0.5">
+                <InlineEditField
+                  value={clientDepartment}
+                  onChange={setClientDepartment}
+                  className="text-[#585956]"
+                  placeholder="Department"
+                />
+              </p>
+
+              {/* Client Contact */}
+              <p className="text-[#585956] text-[11px] mt-1">
+                Client Contact:{" "}
+                <InlineEditField
+                  value={clientContactName}
+                  onChange={setClientContactName}
+                  className="text-[11px] text-[#585956]"
+                  placeholder="Contact name"
+                />
+              </p>
             </div>
 
+            {/* Right: Project Details */}
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#878884] mb-1.5">
                 Project Details:
               </h3>
               <p className="font-semibold text-[#0d6e00] text-xs">
-                Project Name: <span className="font-bold text-[#141514]">{projectName}</span>
+                Project Name:{" "}
+                <InlineEditField
+                  value={editableProjectName}
+                  onChange={setEditableProjectName}
+                  className="font-bold text-[#141514] text-xs"
+                  placeholder="Project name"
+                />
               </p>
               <p className="text-[#585956] mt-0.5 text-[11px]">
-                Budget: <span className="font-mono font-bold text-[#141514]">RM {targetBudget.toLocaleString()}</span>
+                Budget:{" "}
+                <span className="font-mono font-bold text-[#141514]">
+                  RM {targetBudget.toLocaleString()}
+                </span>
               </p>
             </div>
           </div>
@@ -234,7 +390,9 @@ export default function SpecsPreviewView({
                     <td className="px-4 py-3 font-mono font-semibold text-center">{it.quantity}</td>
                     <td className="px-4 py-3">
                       <p className="font-bold text-[#141514]">{displayName(it.component)}</p>
-                      <p className="text-[10px] font-mono text-[#585956] mt-0.5">SKU: {it.component.sku} | Category: {it.component.category}</p>
+                      <p className="text-[10px] font-mono text-[#585956] mt-0.5">
+                        SKU: {it.component.sku} | Category: {it.component.category}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-[#585956]">
                       RM {it.component.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
@@ -255,8 +413,10 @@ export default function SpecsPreviewView({
                 Terms and Conditions
               </h4>
               <p className="text-[10px] text-[#878884] leading-relaxed">
-                1. Quote prices are valid for thirty (30) days from the date shown.<br />
-                2. Prices shown are inclusive of Sales and Service Tax (SST) where applicable.<br />
+                1. Quote prices are valid for thirty (30) days from the date shown.
+                <br />
+                2. Prices shown are inclusive of Sales and Service Tax (SST) where applicable.
+                <br />
                 3. Assembly, testing, and delivery performed under standard B2B terms and conditions.
               </p>
             </div>
@@ -264,12 +424,16 @@ export default function SpecsPreviewView({
             <div className="w-72 shrink-0 border border-[#dadad7] rounded-lg overflow-hidden divide-y divide-[#dadad7]">
               <div className="px-4 py-2 flex justify-between items-center bg-[#faf9f6]">
                 <span className="text-[#585956] font-semibold text-[10px] uppercase">Hardware Subtotal:</span>
-                <span className="font-mono font-bold text-[#141514]">RM {subtotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span className="font-mono font-bold text-[#141514]">
+                  RM {subtotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
               </div>
               <div className="px-4 py-3.5 flex flex-col bg-[#fbfbfa] gap-1">
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#141514] font-bold text-xs uppercase">Grand Total (RM):</span>
-                  <span className="font-mono font-bold text-base text-[#0d6e00]">RM {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  <span className="font-mono font-bold text-base text-[#0d6e00]">
+                    RM {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
                 <div className="text-right">
                   <span className="text-[9px] text-[#878884] italic block leading-normal">
@@ -301,7 +465,6 @@ export default function SpecsPreviewView({
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
